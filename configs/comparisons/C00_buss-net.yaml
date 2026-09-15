@@ -1,0 +1,206 @@
+experiment:
+  name: C00_buss-net
+  type: comparison
+  id: C00
+  display_name: BUSS-Net
+  description: 'Improved C00 built on the fixed 2-D nnU-Net PlainConvUNet with an
+    S4-R2 post-fusion GeoFSS bridge, an S5 GeoFSS global expert routed by BLG,
+    and decoder-side UG-GD.
+
+    '
+model:
+  name: buss-net
+  initialization:
+    mode: random
+    allow_external_weights: false
+  num_classes: 1
+  input_size: 416
+  encoder:
+    type: PlainConvEncoder
+    stages: 6
+    features:
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    - 512
+    convs_per_stage:
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+  geofss:
+    enabled: true
+    stages:
+    - 4
+    - 5
+    stage4:
+      location: decoder_post_fusion
+      bridge_channels: 128
+      # S4-R2 first isolates spatial scan + gated spatial FFN.
+      use_frequency_filter: false
+      frequency_patch_size: 2
+      layer_scale_init: 0.02
+    stage5:
+      location: blg_global_expert
+      bridge_channels: 256
+      # Patch 2 reduces the padded fraction of 10/13/16 bottleneck maps.
+      use_frequency_filter: true
+      frequency_patch_size: 2
+      layer_scale_init: 0.02
+    num_blocks: 4
+    backend: mamba
+    d_state: 8
+    d_conv: 3
+    expand: 2.0
+    parameter_conv_kernel: 7
+    use_geometric_transform: true
+    use_parameter_conv: true
+    ffn_expansion: 3.0
+    use_grid_scan: false
+    scan_patch_size: 32
+    inspiration:
+      repository: https://github.com/kkkls/EVSSM
+      commit: 5098a5276640694a39a941119f9e8bcc3ece9fb0
+  blg:
+    enabled: true
+    formal_name: Boundary-conditioned Local-Global Bottleneck
+    guidance_stage: encoder_s3
+    hidden_channels: 128
+    gate_groups: 4
+    residual_scale: 0.1
+    global_expert: geofss_s5
+    router_identity_bias: 1.0
+  uggd:
+    enabled: true
+    decoder_indices:
+    - 1
+    - 2
+    - 3
+    - 4
+    gather_channels: 64
+    gather_index: 1
+    gate_groups: 4
+    bottleneck_ratio: 0.5
+    max_distribution_scale: 2.0
+    use_entropy: true
+    detach_uncertainty: true
+    variance_weight: 0.5
+    explicit_uncertainty_modulation: true
+    uncertainty_gain: 1.0
+    residual_scale: 0.05
+  decoder:
+    type: UNetDecoder
+    deep_supervision: true
+    normalize_ds_weights: true
+    ds_weights:
+      pred_final: 1.0
+      # Keep the base decoder supervision identical across C00 and A01-A05.
+      pred_s4: 0.125
+      pred_s3: 0.25
+      pred_s2: 0.5
+      pred_uggd_d1: 0.2
+      pred_uggd_d2: 0.2
+      pred_uggd_d3: 0.2
+      pred_uggd_d4: 0.2
+train:
+  epochs: 100
+  input_size: 416
+  batch_size: 12
+  num_workers: 4
+  optimizer: SGD
+  lr: 0.01
+  momentum: 0.99
+  nesterov: true
+  weight_decay: 3.0e-05
+  scheduler: nnunet_poly
+  poly_exponent: 0.9
+  amp: true
+  channels_last: true
+  # GeoFSS/Mamba + AMP currently breaks inductor backward (Half vs Float).
+  # Keep channels_last; leave compile off for C00 until a stable path exists.
+  compile:
+    enabled: false
+    mode: default
+    fullgraph: false
+    dynamic: true
+    suppress_errors: true
+  gradient_clip: 0.75
+  gradient_clip_mode: norm
+  multi_scale_rates:
+  - 0.75
+  - 1.0
+  - 1.25
+  ema:
+    enabled: true
+    decay: 0.999
+  augmentation:
+    enabled: true
+    profile: default
+  differential_lr:
+    enabled: true
+    default_multiplier: 1.0
+    groups:
+      geofss_s4:
+        prefixes:
+        - stage4_bridge.
+        multiplier: 1.5
+      geofss_s5:
+        prefixes:
+        - stage5_bridge.
+        multiplier: 1.5
+      blg:
+        prefixes:
+        - blg.
+        multiplier: 1.5
+      uggd:
+        prefixes:
+        - uggd.
+        multiplier: 1.5
+  residual_warmup:
+    # GeoFSS now uses one LayerScale mechanism; routed modules start directly
+    # from their own residual scales/gates instead of a second long warm-up.
+    enabled: false
+  dynamic_deep_supervision:
+    enabled: true
+    decay_start_epoch: 50
+    decay_end_epoch: 90
+    start_factor: 1.0
+    end_factor: 0.25
+    final_output: pred_final
+  boundary_decay:
+    enabled: true
+    decay_start_epoch: 62
+    decay_end_epoch: 100
+    start_weight: 0.2
+    end_weight: 0.05
+loss:
+  structure:
+    type: bce_dice
+    bce_weight: 1.0
+    dice_weight: 1.0
+  boundary:
+    weight: 0.2
+    kernel_size: 3
+  routing:
+    # Optional differentiable BLG/UG-GD route supervision; keep disabled until
+    # its weight has been validated in a controlled ablation.
+    weight: 0.0
+dataset:
+  train_image_dir: data/processed/train/image
+  train_mask_dir: data/processed/train/mask
+  eval_split: data/processed/splits/eval_split.json
+  test_root: data/processed/test
+reproducibility:
+  seed: 2026
+  cudnn_benchmark: true
+  cudnn_deterministic: false
+logging:
+  image_interval: 10
+  save_val_batches: true
+  save_agf_heatmaps: false
+output:
+  exp_dir: experiments/comparisons/C00_buss-net

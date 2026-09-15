@@ -1,0 +1,10 @@
+albumentations>=1.4,<3
+dynamic-network-architectures>=0.3
+mamba-ssm>=2.2
+nnunetv2>=2.5
+numpy>=1.24
+opencv-python-headless>=4.8
+PyYAML>=6.0
+rich>=13.0
+tensorboard>=2.15
+tqdm>=4.66

@@ -1,0 +1,50 @@
+# Datasets and generated manifests
+data/
+
+# Experiments, predictions, logs, and checkpoints
+experiments/
+outputs/
+runs/
+logs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+
+# Test and local development material
+tests/
+test/
+devtools/
+论文写作中/
+.agents/
+.codex_journal_tmp/
+
+# Python and environment files
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Documents and archives
+*.doc
+*.docx
+*.pdf
+*.ppt
+*.pptx
+*.zip
+*.tar
+*.tar.gz
+*.7z
