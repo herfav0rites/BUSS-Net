@@ -89,6 +89,3 @@ python scripts/train.py --config configs/comparisons/C00_buss-net.yaml --device 
 
 The formal configuration trains for 100 epochs at 416 x 416 resolution, uses random initialization, and writes checkpoints and logs below `experiments/comparisons/C00_buss-net/`. The complete `experiments/` directory is ignored by Git.
 
-## Attribution
-
-The GeoFSS implementation is adapted from the MIT-licensed [EVSSM](https://github.com/kkkls/EVSSM) project at commit `5098a5276640694a39a941119f9e8bcc3ece9fb0`. See [NOTICE.md](NOTICE.md) for external components. No license is granted for BUSS-Net itself unless a license file is added by the repository owner.
